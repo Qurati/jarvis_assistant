@@ -1,3 +1,7 @@
+#================================
+# stt - Speech to text
+#================================
+
 import sounddevice as sd
 import vosk
 import sys
