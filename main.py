@@ -17,10 +17,8 @@ def execute(text: str):
     try:
         print(f"> {text}")
         if 'джарвис' in text.split(' '):
-
             if equ(text, "команда"):
                 tts.text2speech("ответ-озвучка")
-                print(f"- {text}")
 
             # дальнейшая логика
             elif equ(text, 'спасибо'):
@@ -30,10 +28,12 @@ def execute(text: str):
                     case 2:
                         filename = 'sounds/jarvis/thanks/at_your_service.wav'
 
-                data, fs = sf.read(filename, dtype='float32')
-                sd.play(data, fs)
-                status = sd.wait()
-                print(f"- {text}")
+            elif text == 'джарвис':
+                match randint(1, 2):
+                    case 1:
+                        filename = 'sounds/jarvis/here/yeah_sir.wav'
+                    case 2:
+                        filename = 'sounds/jarvis/here/yeah_sir_2.wav'
 
             elif equ(text, "выключись"):
                 match randint(1, 2):
@@ -41,35 +41,20 @@ def execute(text: str):
                         filename = 'sounds/jarvis/bye/turning_off_and_diagn_syst.wav'
                     case 2:
                         filename = 'sounds/jarvis/bye/turning_off.wav'
-
                 data, fs = sf.read(filename, dtype='float32')
                 sd.play(data, fs)
-                status = sd.wait()
-                print(f"- {text}")
+                sd.wait()
                 raise SystemExit
-            
-            elif text == 'джарвис':
-                match randint(1, 2):
-                    case 1:
-                        filename = 'sounds/jarvis/here/yeah_sir.wav'
-                    case 2:
-                        filename = 'sounds/jarvis/here/yeah_sir_2.wav'
-        
-                data, fs = sf.read(filename, dtype='float32')
-                sd.play(data, fs)
-                status = sd.wait()
-                print(f"- {text}")
 
             else:
                 if text:
                     print('- неизвестная команда')
                     filename = 'sounds/jarvis/else/question.wav'
-                    data, fs = sf.read(filename, dtype='float32')
-                    sd.play(data, fs)
-                    status = sd.wait()
-    except Exception:
-        print(f"ERROR: {Exception}")
-
+            data, fs = sf.read(filename, dtype='float32')
+            sd.play(data, fs)
+            status = sd.wait()
+    except Exception as e:
+        print(f"ERROR: {e}")
 
 tts = TTS()
 stt = STT(modelpath="vosk-model-small-ru-0.22")
