@@ -12,12 +12,21 @@ import datetime
 def equ(text, needed):
     return fuzz.ratio(text, needed) >= 45
 
+#---------------------------------------
+# класс ассистента. Параметры:
+# speaker - кто будет озвучивать (xenia или aidar),
+# jarvis_speak - нужно ли отвечать фразами джарвиса из фильма,
+#name - имя ассистента
+#---------------------------------------
 class Jarvis:
     def __init__(self, speaker: str, jarvis_speak: bool, name: str):
         self.jarvis_speak = jarvis_speak
         self.tts = TTS(speaker=speaker)
         self.name = name
 
+        #---------------------------------------
+        #приветствие при запуске
+        #---------------------------------------
         try:
             if jarvis_speak:
                 if (datetime.time(5, 30) >=
@@ -39,7 +48,8 @@ class Jarvis:
                 self.tts.text2speech('здравствуйте, сер')
         except Exception as e:
             print(f'err: {e}')
-            self.__init__(speaker, jarvis_speak, name) #Использую рекурсию чтоб при ошибке воспроизведения аудио Джарвиса класс инициализировался снова и пытался проиграть аудио
+            #Использую рекурсию чтоб при ошибке воспроизведения аудио Джарвиса класс инициализировался снова и пытался проиграть аудио
+            self.__init__(speaker, jarvis_speak, name)
 
     def execute(self, text: str):
         try:
@@ -99,6 +109,5 @@ class Jarvis:
 
 stt = STT(modelpath="vosk-model-small-ru-0.22")
 print("listen...")
-assistant = Jarvis(speaker = 'aidar', jarvis_speak=True, name = 'джарвиса')# можно менять озвучку при помощи параметра speaker: speaker='xenia'.
-                                                        # Будут использоваться фразы джарвиса или нет - jarvis_speak
+assistant = Jarvis(speaker = 'aidar', jarvis_speak=True, name = 'джарвиса')
 stt.listen(assistant.execute)
