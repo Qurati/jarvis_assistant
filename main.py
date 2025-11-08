@@ -12,66 +12,93 @@ import datetime
 def equ(text, needed):
     return fuzz.ratio(text, needed) >= 45
 
+class Jarvis:
+    def __init__(self, speaker: str, jarvis_speak: bool, name: str):
+        self.jarvis_speak = jarvis_speak
+        self.tts = TTS(speaker=speaker)
+        self.name = name
 
-def execute(text: str):
-    try:
-        print(f"> {text}")
-        if 'джарвис' in text.split(' '):
-            if equ(text, "команда"):
-                tts.text2speech("ответ-озвучка")
-
-            # дальнейшая логика
-            elif equ(text, 'спасибо'):
-                match randint(1, 2):
-                    case 1:
-                        filename = 'sounds/jarvis/thanks/always_at_your_service.wav'
-                    case 2:
-                        filename = 'sounds/jarvis/thanks/at_your_service.wav'
-
-            elif text == 'джарвис':
-                match randint(1, 2):
-                    case 1:
-                        filename = 'sounds/jarvis/here/yeah_sir.wav'
-                    case 2:
-                        filename = 'sounds/jarvis/here/yeah_sir_2.wav'
-
-            elif equ(text, "выключись"):
-                match randint(1, 2):
-                    case 1:
-                        filename = 'sounds/jarvis/bye/turning_off_and_diagn_syst.wav'
-                    case 2:
-                        filename = 'sounds/jarvis/bye/turning_off.wav'
+        try:
+            if jarvis_speak:
+                if (datetime.time(5, 30) >=
+                    datetime.time(datetime.datetime.now().hour, datetime.datetime.now().minute) <=
+                    datetime.time(11, 0)):
+                    filename = 'sounds/jarvis/Greetings/good_morning.wav'
+                else:
+                    match randint(1, 3):
+                        case 1:
+                            filename = 'sounds/jarvis/Greetings/start_diagn_syst.wav'
+                        case 2:
+                            filename = 'sounds/jarvis/Greetings/49.wav'
+                        case 3:
+                            filename = 'sounds/jarvis/Greetings/greeting_with_music'
                 data, fs = sf.read(filename, dtype='float32')
                 sd.play(data, fs)
-                sd.wait()
-                raise SystemExit
-
+                status = sd.wait()
             else:
-                if text:
-                    print('- неизвестная команда')
-                    filename = 'sounds/jarvis/else/question.wav'
-            data, fs = sf.read(filename, dtype='float32')
-            sd.play(data, fs)
-            status = sd.wait()
-    except Exception as e:
-        print(f"ERROR: {e}")
+                self.tts.text2speech('здравствуйте, сер')
+        except Exception as e:
+            print(f'err: {e}')
+            self.__init__(speaker, jarvis_speak, name) #Использую рекурсию чтоб при ошибке воспроизведения аудио Джарвиса класс инициализировался снова и пытался проиграть аудио
 
-tts = TTS()
+    def execute(self, text: str):
+        try:
+            print(f"> {text}")
+            if self.name in text.split(' '):
+                if equ(text, "команда"):
+                    self.tts.text2speech("ответ-озвучка")
+
+                # дальнейшая логика
+                elif equ(text, 'спасибо'):
+                    if self.jarvis_speak:
+                        match randint(1, 2):
+                            case 1:
+                                filename = 'sounds/jarvis/thanks/always_at_your_service.wav'
+                            case 2:
+                                filename = 'sounds/jarvis/thanks/at_your_service.wav'
+                    else:
+                        self.tts.text2speech('к вашим услугам, сер')
+
+                elif text == self.name:
+                    if self.jarvis_speak:
+                        match randint(1, 2):
+                            case 1:
+                                filename = 'sounds/jarvis/here/yeah_sir.wav'
+                            case 2:
+                                filename = 'sounds/jarvis/here/yeah_sir_2.wav'
+                    else:
+                        self.tts.text2speech('да, сер?')
+
+                elif equ(text, "выключись"):
+                    if self.jarvis_speak:
+                        match randint(1, 2):
+                            case 1:
+                                filename = 'sounds/jarvis/bye/turning_off_and_diagn_syst.wav'
+                            case 2:
+                                filename = 'sounds/jarvis/bye/turning_off.wav'
+                        data, fs = sf.read(filename, dtype='float32')
+                        sd.play(data, fs)
+                        sd.wait()
+                    else:
+                        self.tts.text2speech('до встречи')
+                    raise SystemExit
+
+                else:
+                    if text:
+                        print('- неизвестная команда')
+                        if self.jarvis_speak:
+                            filename = 'sounds/jarvis/else/question.wav'
+                        else:
+                            self.tts.text2speech('чего вы пытаетесь добиться?')
+                if self.jarvis_speak:
+                    data, fs = sf.read(filename, dtype='float32')
+                    sd.play(data, fs)
+                    status = sd.wait()
+        except Exception as e:
+            print(f"ERROR: {e}")
+
 stt = STT(modelpath="vosk-model-small-ru-0.22")
-if datetime.time(5, 30) >= datetime.time(datetime.datetime.now().hour, datetime.datetime.now().minute) <= datetime.time(11, 0):
-    filename = 'sounds/jarvis/Greetings/good_morning.wav'
-else:
-    match randint(1, 3):
-        case 1:
-            filename = 'sounds/jarvis/Greetings/start_diagn_syst.wav'
-        case 2:
-            filename = 'sounds/jarvis/Greetings/49.wav'
-        case 3:
-            filename = 'sounds/jarvis/Greetings/greeting_with_music'
-
-data, fs = sf.read(filename, dtype='float32')
-sd.play(data, fs)
-status = sd.wait()
-
 print("listen...")
-stt.listen(execute)
+assistant = Jarvis(speaker = 'aidar', jarvis_speak=True, name = 'джарвиса')# можно менять озвучку при помощи параметра speaker: speaker='xenia'.
+                                                        # Будут использоваться фразы джарвиса или нет - jarvis_speak
+stt.listen(assistant.execute)
