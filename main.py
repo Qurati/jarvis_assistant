@@ -101,7 +101,7 @@ class Jarvis:
                 # показывает все команды
                 elif equ(text, 'напиши все комманды') or equ(text, 'напиши все твои комманды'):
                     filename = 'sounds/jarvis/request/request_completed.wav'
-                    HC.helper_commands.write_all_commands()
+                    HC.helper_commands.output_all_commands()
 
                 # отвечает людям на неудовлетворительный ответ
                 elif equ(text, 'неправильно') or equ(text, 'что за фигня') or equ(text, 'неверно') or equ(text, 'не смешно'):
