@@ -35,6 +35,7 @@ class Jarvis:
         self.is_speaking = False  # Флаг для отслеживания состояния синтеза
         self.synthesis_queue = []  # Очередь для синтеза
         self.current_sentence_index = 0
+        self.stt = STT(modelpath="vosk-model-small-ru-0.22")  # Инициализируем STT заранее
 
         # Инициализация WWD
         self.initialize_wwd()
@@ -80,7 +81,7 @@ class Jarvis:
     def speak_sync(self, text: str):
         return self.tts.text2speech(text)
 
-    def speak_async(self, text: str):
+    def speak_async(self, text: str, callback: callable = None):
         if self.is_speaking:
             print("Ассистент уже говорит, добавляю в очередь...")
 
@@ -94,16 +95,29 @@ class Jarvis:
 
             self.is_speaking = False
             print("Воспроизведение завершено")
+            if callback:
+                callback()
 
         self.tts.text2speech_async(text, synthesis_callback)
 
-    def speak_multiple_async(self, texts: list):
+    def speak_and_listen(self, text: str):
+
+        def start_listening_after_speech():
+            print("Запускаю прослушивание команды...")
+            self.stt.listen_once(self.commands, timeout=5)
+
+        self.speak_async(text, start_listening_after_speech)
+
+    def speak_multiple_async(self, texts: list, callback: callable = None):
         if not texts:
+            if callback:
+                callback()
             return
 
         self.synthesis_queue = texts.copy()
         self.current_sentence_index = 0
         self.is_speaking = True
+        self.final_callback = callback
 
         print(f"Начинаю синтез {len(texts)} фраз...")
         self._process_next_sentence()
@@ -112,6 +126,8 @@ class Jarvis:
         if self.current_sentence_index >= len(self.synthesis_queue):
             print("Все фразы синтезированы")
             self.is_speaking = False
+            if self.final_callback:
+                self.final_callback()
             return
 
         current_text = self.synthesis_queue[self.current_sentence_index]
@@ -129,7 +145,6 @@ class Jarvis:
             self._process_next_sentence()
 
         self.tts.text2speech_async(current_text, callback)
-
 
     # Разбиение на предложения
     def _split_into_sentences(self, text: str, max_length: int = 150):
@@ -173,7 +188,10 @@ class Jarvis:
 
         print(f"Разбито на {len(sentences)} предложений")
         if sentences:
-            self.speak_multiple_async(sentences)
+            def after_ai_response():
+                print("Ответ ИИ завершен, готов к новым командам")
+
+            self.speak_multiple_async(sentences, after_ai_response)
         else:
             print("Не удалось разбить текст на предложения")
             self.speak_async(ai_text)
@@ -214,7 +232,6 @@ class Jarvis:
                 else:
                     self.speak_sync('к вашим услугам, сер')
 
-
             elif equ(text, "тест асинхрон"):
                 # Тест асинхронного синтеза
                 test_phrases = [
@@ -240,8 +257,6 @@ class Jarvis:
                 # Пример длинного текста для тестирования
                 long_text = """Это пример длинного текста который будет синтезирован асинхронно. Ассистент разобьет его на несколько предложений и обработает последовательно. Это позволяет не блокировать основной поток во время синтеза длинных ответов."""
                 self.process_ai_response(long_text)
-
-
 
             elif equ(text, "выключись"):
                 if self.jarvis_speak:
@@ -296,6 +311,15 @@ class Jarvis:
 
     def on_wake_word_detected(self):
         print("WWD распознан")
+
+        def start_listening():
+            print("Готов к приему команды...")
+            self.stt.listen_once(self.commands, timeout=10)
+
+        import threading
+        listen_thread = threading.Thread(target=start_listening, daemon=True)
+        listen_thread.start()
+
         if self.jarvis_speak:
             match randint(1, 2):
                 case 1:
@@ -307,13 +331,9 @@ class Jarvis:
                 sd.play(data, fs)
                 sd.wait()
             else:
-                self.speak_sync('да, сэр?')
+                self.speak_async('да, сэр?')
         else:
-            self.speak_sync('да, сэр?')
-
-        # Запускаем прослушивание команды
-        stt = STT(modelpath="vosk-model-small-ru-0.22")
-        stt.listen_once(self.commands)
+            self.speak_async('да, сэр?')
 
     def cleanup(self):
         print("Остановка ассистента...")
