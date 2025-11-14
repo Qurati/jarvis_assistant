@@ -7,21 +7,22 @@ import soundfile as sf
 from random import randint
 import datetime
 import os
+import time
 
 
-#---------------------------------------
-# проверка на совпадение текста >= 45%
-#---------------------------------------
+# ---------------------------------------
+# проверка на совпадение текста >= 60%
+# ---------------------------------------
 def equ(text, needed):
-    return fuzz.ratio(text, needed) >= 45
+    return fuzz.ratio(text, needed) >= 60
 
 
-#---------------------------------------
+# ---------------------------------------
 # класс ассистента. Параметры:
 # speaker - кто будет озвучивать (xenia или aidar),
 # jarvis_speak - нужно ли отвечать фразами джарвиса из фильма,
 # name - имя ассистента
-#---------------------------------------
+# ---------------------------------------
 class Jarvis:
     def __init__(self, speaker: str, jarvis_speak: bool, name: str, picovoice_keyword_path: str, picovoice_token: str):
         self.jarvis_speak = jarvis_speak
@@ -31,6 +32,9 @@ class Jarvis:
         self.picovoice_keyword_path = picovoice_keyword_path
         self.is_active = False
         self.wwd = None
+        self.is_speaking = False  # Флаг для отслеживания состояния синтеза
+        self.synthesis_queue = []  # Очередь для синтеза
+        self.current_sentence_index = 0
 
         # Инициализация WWD
         self.initialize_wwd()
@@ -66,12 +70,113 @@ class Jarvis:
                     sd.play(data, fs)
                     sd.wait()
                 else:
-                    self.tts.text2speech('здравствуйте, сэр')
+                    self.speak_sync('здравствуйте, сэр')
             else:
-                self.tts.text2speech('здравствуйте, сэр')
+                self.speak_sync('здравствуйте, сэр')
         except Exception as e:
             print(f'Ошибка приветствия: {e}')
-            self.tts.text2speech('Система запущена')
+            self.speak_sync('Система запущена')
+
+    def speak_sync(self, text: str):
+        return self.tts.text2speech(text)
+
+    def speak_async(self, text: str):
+        if self.is_speaking:
+            print("Ассистент уже говорит, добавляю в очередь...")
+
+        self.is_speaking = True
+
+        def synthesis_callback(audio, synthesis_time):
+            print(f"Синтез завершен за {synthesis_time:.2f} сек, начинаю воспроизведение...")
+
+            sd.play(audio, samplerate=self.tts.samplerate)
+            sd.wait()
+
+            self.is_speaking = False
+            print("Воспроизведение завершено")
+
+        self.tts.text2speech_async(text, synthesis_callback)
+
+    def speak_multiple_async(self, texts: list):
+        if not texts:
+            return
+
+        self.synthesis_queue = texts.copy()
+        self.current_sentence_index = 0
+        self.is_speaking = True
+
+        print(f"Начинаю синтез {len(texts)} фраз...")
+        self._process_next_sentence()
+
+    def _process_next_sentence(self):
+        if self.current_sentence_index >= len(self.synthesis_queue):
+            print("Все фразы синтезированы")
+            self.is_speaking = False
+            return
+
+        current_text = self.synthesis_queue[self.current_sentence_index]
+        current_index = self.current_sentence_index + 1
+        total_count = len(self.synthesis_queue)
+
+        print(f"Синтез фразы {current_index}/{total_count}: {current_text}")
+
+        def callback(audio, synthesis_time):
+            print(f"Фраза {current_index} готова за {synthesis_time:.2f} сек")
+            sd.play(audio, samplerate=self.tts.samplerate)
+            sd.wait()
+
+            self.current_sentence_index += 1
+            self._process_next_sentence()
+
+        self.tts.text2speech_async(current_text, callback)
+
+
+    # Разбиение на предложения
+    def _split_into_sentences(self, text: str, max_length: int = 150):
+        import re
+
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        sentences = [s.strip() for s in sentences if s.strip()]
+
+        result = []
+        for sentence in sentences:
+            if len(sentence) <= max_length:
+                result.append(sentence)
+            else:
+                parts = re.split(r'(?<=[,;:])\s+', sentence)
+                for part in parts:
+                    part = part.strip()
+                    if part:
+                        if len(part) > max_length:
+                            words = part.split()
+                            current_chunk = ""
+                            for word in words:
+                                if len(current_chunk) + len(word) + 1 <= max_length:
+                                    current_chunk += " " + word if current_chunk else word
+                                else:
+                                    if current_chunk:
+                                        result.append(current_chunk + ".")
+                                    current_chunk = word
+                            if current_chunk:
+                                result.append(current_chunk + ".")
+                        else:
+                            result.append(part)
+
+        return [s for s in result if s]
+
+    def process_ai_response(self, ai_text: str):
+        print(f"\n ИИ ({len(ai_text)} символов):")
+        print(f"{ai_text[:100]}...")
+
+        # Разбиваем длинный текст на предложения для более плавного синтеза
+        sentences = self._split_into_sentences(ai_text)
+
+        print(f"Разбито на {len(sentences)} предложений")
+        if sentences:
+            self.speak_multiple_async(sentences)
+        else:
+            print("Не удалось разбить текст на предложения")
+            self.speak_async(ai_text)
 
     def commands(self, text: str):
         text = text.lower()
@@ -79,7 +184,7 @@ class Jarvis:
             print(f"> Распознано: {text}")
 
             if equ(text, "команда"):
-                self.tts.text2speech("ответ-озвучка")
+                self.speak_sync("ответ-озвучка")
 
             elif equ(text, 'привет'):
                 if self.jarvis_speak:
@@ -88,8 +193,10 @@ class Jarvis:
                         data, fs = sf.read(filename, dtype='float32')
                         sd.play(data, fs)
                         sd.wait()
+                    else:
+                        self.speak_sync('как вы?')
                 else:
-                    self.tts.text2speech('как вы?')
+                    self.speak_sync('как вы?')
 
             elif equ(text, 'спасибо'):
                 if self.jarvis_speak:
@@ -103,9 +210,38 @@ class Jarvis:
                         sd.play(data, fs)
                         sd.wait()
                     else:
-                        self.tts.text2speech('к вашим услугам, сер')
+                        self.speak_sync('к вашим услугам, сер')
                 else:
-                    self.tts.text2speech('к вашим услугам, сер')
+                    self.speak_sync('к вашим услугам, сер')
+
+
+            elif equ(text, "тест асинхрон"):
+                # Тест асинхронного синтеза
+                test_phrases = [
+                    "Первая тестовая фраза для асинхронного синтеза.",
+                    "Вторая фраза обрабатывается параллельно.",
+                    "Третья фраза завершает тестирование.",
+                ]
+                self.speak_multiple_async(test_phrases)
+
+            elif equ(text, "статистика"):
+                # Показать статистику TTS
+                stats = self.tts.get_performance_stats()
+                print(f"\n СТАТИСТИКА ПРОИЗВОДИТЕЛЬНОСТИ TTS:")
+                print(f"   Всего синтезов: {stats['total_syntheses']}")
+                if stats['total_syntheses'] > 0:
+                    print(f"   Среднее время: {stats['avg_synthesis_time']:.2f} сек")
+                    print(f"   Минимальное время: {stats['min_synthesis_time']:.2f} сек")
+                    print(f"   Максимальное время: {stats['max_synthesis_time']:.2f} сек")
+                    print(f"   Общее время синтеза: {stats['total_synthesis_time']:.2f} сек")
+                print(f"   Устройство: {stats['device']}")
+
+            elif equ(text, "длинный текст"):
+                # Пример длинного текста для тестирования
+                long_text = """Это пример длинного текста который будет синтезирован асинхронно. Ассистент разобьет его на несколько предложений и обработает последовательно. Это позволяет не блокировать основной поток во время синтеза длинных ответов."""
+                self.process_ai_response(long_text)
+
+
 
             elif equ(text, "выключись"):
                 if self.jarvis_speak:
@@ -118,8 +254,16 @@ class Jarvis:
                         data, fs = sf.read(filename, dtype='float32')
                         sd.play(data, fs)
                         sd.wait()
+                    else:
+                        self.speak_sync('до встречи')
                 else:
-                    self.tts.text2speech('до встречи')
+                    self.speak_sync('до встречи')
+
+                # Ожидаем завершения всех синтезов перед выключением
+                if self.is_speaking:
+                    print("Ожидаю завершения синтеза...")
+                    self.tts.wait_queue_empty()
+
                 self.cleanup()
                 raise SystemExit
 
@@ -139,9 +283,9 @@ class Jarvis:
                             sd.play(data, fs)
                             sd.wait()
                         else:
-                            self.tts.text2speech('чего вы пытаетесь добиться?')
+                            self.speak_async('чего вы пытаетесь добиться?')
                     else:
-                        self.tts.text2speech('чего вы пытаетесь добиться?')
+                        self.speak_async('чего вы пытаетесь добиться?')
 
         except Exception as e:
             print(f"commands: {e}")
@@ -163,17 +307,25 @@ class Jarvis:
                 sd.play(data, fs)
                 sd.wait()
             else:
-                self.tts.text2speech('да, сэр?')
+                self.speak_sync('да, сэр?')
         else:
-            self.tts.text2speech('да, сэр?')
+            self.speak_sync('да, сэр?')
 
         # Запускаем прослушивание команды
         stt = STT(modelpath="vosk-model-small-ru-0.22")
         stt.listen_once(self.commands)
 
     def cleanup(self):
+        print("Остановка ассистента...")
+        if self.is_speaking:
+            print("Ожидаю завершения текущего синтеза...")
+            self.tts.wait_queue_empty()
+
         if self.wwd:
             self.wwd.cleanup()
+
+        self.tts.cleanup()
+        print("Все ресурсы освобождены")
 
 
 # Запуск ассистента
@@ -184,11 +336,11 @@ if __name__ == "__main__":
             jarvis_speak=True,
             name='джарвис',
             picovoice_keyword_path="./jarvis_en_windows_v3_0_0.ppn",
-            picovoice_token='YOUR_TOKEN'
+            picovoice_token='ry6k0XKmcCYHCRMzz9FHl/SS/9ZpitBERPyHaFhSBlw6jA/dLS8WhA=='
         )
-
         print("Ассистент запущен")
         assistant.start_listening_for_wake_word()
-
+    except SystemExit:
+        print("Ассистент завершает работу...")
     except Exception as e:
         print(f"Начальная ошибка: {e}")
