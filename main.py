@@ -1,3 +1,5 @@
+import webbrowser
+
 from fuzzywuzzy import fuzz
 from tts import TTS
 from stt import STT
@@ -8,6 +10,8 @@ from random import randint
 import datetime
 import os
 import time
+import yandex
+from config import *
 
 
 # ---------------------------------------
@@ -55,7 +59,7 @@ class Jarvis:
         try:
             if self.jarvis_speak:
                 current_time = datetime.datetime.now().time()
-                if datetime.time(5, 30) <= current_time <= datetime.time(11, 0):
+                if datetime.time(4, 00) <= current_time <= datetime.time(11, 0):
                     filename = 'sounds/jarvis/Greetings/good_morning.wav'
                 else:
                     match randint(1, 3):
@@ -282,32 +286,41 @@ class Jarvis:
                 self.cleanup()
                 raise SystemExit
 
+
             else:
-                if text.strip():
-                    print('- неизвестная команда')
-                    if self.jarvis_speak:
-                        match randint(1, 3):
-                            case 1:
-                                filename = 'sounds/jarvis/else/question.wav'
-                            case 2:
-                                filename = 'sounds/jarvis/else/terabytes_of_data_have_not_been_calculated_yet.wav'
-                            case 3:
-                                filename = 'sounds/jarvis/else/no_info.wav'
-                        if os.path.exists(filename):
-                            data, fs = sf.read(filename, dtype='float32')
-                            sd.play(data, fs)
-                            sd.wait()
-                        else:
-                            self.speak_async('чего вы пытаетесь добиться?')
-                    else:
-                        self.speak_async('чего вы пытаетесь добиться?')
+                print('- неизвестная команда')
+                ans = yandex.get_yandex_answer(text)
+                print(ans.split(' '))
+                if ans.split(' ')[0]=='сайт':
+                    print(ans.split(' ')[1])
+                    webbrowser.open_new_tab(ans.split(' ')[1])
+                else:
+                    self.process_ai_response(ans)
+                # if self.jarvis_speak:
+                #     match randint(1, 3):
+                #         case 1:
+                #             filename = 'sounds/jarvis/else/question.wav'
+                 #         case 2:
+                #             filename = 'sounds/jarvis/else/terabytes_of_data_have_not_been_calculated_yet.wav'
+                #         case 3:
+                #             filename = 'sounds/jarvis/else/no_info.wav'
+                #     if os.path.exists(filename):
+                #         data, fs = sf.read(filename, dtype='float32')
+                #         sd.play(data, fs)
+                #         sd.wait()
+                #     else:
+                #         self.speak_async('чего вы пытаетесь добиться?')
+                # else:
+                #     self.speak_async('чего вы пытаетесь добиться?')
 
         except Exception as e:
             print(f"commands: {e}")
 
+
     def start_listening_for_wake_word(self):
         if self.wwd:
             self.wwd.start_listening(self.on_wake_word_detected)
+
 
     def on_wake_word_detected(self):
         print("WWD распознан")
@@ -335,6 +348,7 @@ class Jarvis:
         else:
             self.speak_async('да, сэр?')
 
+
     def cleanup(self):
         print("Остановка ассистента...")
         if self.is_speaking:
@@ -356,7 +370,7 @@ if __name__ == "__main__":
             jarvis_speak=True,
             name='джарвис',
             picovoice_keyword_path="./jarvis_en_windows_v3_0_0.ppn",
-            picovoice_token='ry6k0XKmcCYHCRMzz9FHl/SS/9ZpitBERPyHaFhSBlw6jA/dLS8WhA=='
+            picovoice_token=picovoice_token
         )
         print("Ассистент запущен")
         assistant.start_listening_for_wake_word()
