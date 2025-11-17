@@ -1,5 +1,5 @@
 import webbrowser
-
+import threading
 from fuzzywuzzy import fuzz
 from tts import TTS
 from stt import STT
@@ -329,7 +329,6 @@ class Jarvis:
             print("Готов к приему команды...")
             self.stt.listen_once(self.commands, timeout=10)
 
-        import threading
         listen_thread = threading.Thread(target=start_listening, daemon=True)
         listen_thread.start()
 

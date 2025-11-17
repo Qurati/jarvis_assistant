@@ -14,10 +14,9 @@ class STT:
         self.model = vosk.Model(modelpath)
         self.samplerate = samplerate
         self.is_listening = False
-
+        self.rec = vosk.KaldiRecognizer(self.model, self.samplerate)
     # Прослушивание команды с таймаутом
     def listen_once(self, executor: callable, timeout: int = 5):
-        rec = vosk.KaldiRecognizer(self.model, self.samplerate)
         q = queue.Queue()
 
         def callback(indata, frames, time, status):
@@ -43,8 +42,8 @@ class STT:
                 while self.is_listening and (time.time() - start_time) < timeout:
                     try:
                         data = q.get(timeout=1)
-                        if rec.AcceptWaveform(data):
-                            result = json.loads(rec.Result())
+                        if self.rec.AcceptWaveform(data):
+                            result = json.loads(self.rec.Result())
                             text = result["text"].strip()
                             if text:  # Если распознан непустой текст
                                 executor(text)
