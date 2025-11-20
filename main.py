@@ -1,5 +1,7 @@
 import webbrowser
 import threading
+from fileinput import filename
+
 from fuzzywuzzy import fuzz
 from tts import TTS
 from stt import STT
@@ -9,7 +11,7 @@ import soundfile as sf
 from random import randint
 import datetime
 import os
-import time
+from scripts.commands import *
 import yandex
 from config import *
 
@@ -18,6 +20,11 @@ from config import *
 # проверка на совпадение текста >= 60%
 # ---------------------------------------
 def equ(text, needed):
+    if type(needed) == list:
+        for i in needed:
+            if fuzz.ratio(text, i) >=80:
+                return True
+
     return fuzz.ratio(text, needed) >= 60
 
 
@@ -66,18 +73,15 @@ class Jarvis:
                         case 1:
                             filename = 'sounds/jarvis/Greetings/start_diagn_syst.wav'
                         case 2:
-                            filename = 'sounds/jarvis/Greetings/49.wav'
+                            filename = 'sounds/jarvis/Greetings/how_are_you.wav'
                         case 3:
                             filename = 'sounds/jarvis/Greetings/greeting_with_music.wav'
-
-                if os.path.exists(filename):
                     data, fs = sf.read(filename, dtype='float32')
                     sd.play(data, fs)
                     sd.wait()
-                else:
-                    self.speak_sync('здравствуйте, сэр')
             else:
                 self.speak_sync('здравствуйте, сэр')
+
         except Exception as e:
             print(f'Ошибка приветствия: {e}')
             self.speak_sync('Система запущена')
@@ -236,31 +240,14 @@ class Jarvis:
                 else:
                     self.speak_sync('к вашим услугам, сер')
 
-            elif equ(text, "тест асинхрон"):
-                # Тест асинхронного синтеза
-                test_phrases = [
-                    "Первая тестовая фраза для асинхронного синтеза.",
-                    "Вторая фраза обрабатывается параллельно.",
-                    "Третья фраза завершает тестирование.",
-                ]
-                self.speak_multiple_async(test_phrases)
+            elif equ(text, ['выключи игровой режим', 'выключи игру',
+                                    'выйди из игрового режима', ]):
+                print('close')
+                close_steam_bigpicture()
 
-            elif equ(text, "статистика"):
-                # Показать статистику TTS
-                stats = self.tts.get_performance_stats()
-                print(f"\n СТАТИСТИКА ПРОИЗВОДИТЕЛЬНОСТИ TTS:")
-                print(f"   Всего синтезов: {stats['total_syntheses']}")
-                if stats['total_syntheses'] > 0:
-                    print(f"   Среднее время: {stats['avg_synthesis_time']:.2f} сек")
-                    print(f"   Минимальное время: {stats['min_synthesis_time']:.2f} сек")
-                    print(f"   Максимальное время: {stats['max_synthesis_time']:.2f} сек")
-                    print(f"   Общее время синтеза: {stats['total_synthesis_time']:.2f} сек")
-                print(f"   Устройство: {stats['device']}")
-
-            elif equ(text, "длинный текст"):
-                # Пример длинного текста для тестирования
-                long_text = """Это пример длинного текста который будет синтезирован асинхронно. Ассистент разобьет его на несколько предложений и обработает последовательно. Это позволяет не блокировать основной поток во время синтеза длинных ответов."""
-                self.process_ai_response(long_text)
+            elif equ(text, ['игровой режим', 'игра с геймпадом', 'игра с контроллером', 'игра с джойстиком', 'включи игровой режим']):
+                print('open')
+                open_steam_bigpicture()
 
             elif equ(text, "выключись"):
                 if self.jarvis_speak:
@@ -296,22 +283,6 @@ class Jarvis:
                     webbrowser.open_new_tab(ans.split(' ')[1])
                 else:
                     self.process_ai_response(ans)
-                # if self.jarvis_speak:
-                #     match randint(1, 3):
-                #         case 1:
-                #             filename = 'sounds/jarvis/else/question.wav'
-                 #         case 2:
-                #             filename = 'sounds/jarvis/else/terabytes_of_data_have_not_been_calculated_yet.wav'
-                #         case 3:
-                #             filename = 'sounds/jarvis/else/no_info.wav'
-                #     if os.path.exists(filename):
-                #         data, fs = sf.read(filename, dtype='float32')
-                #         sd.play(data, fs)
-                #         sd.wait()
-                #     else:
-                #         self.speak_async('чего вы пытаетесь добиться?')
-                # else:
-                #     self.speak_async('чего вы пытаетесь добиться?')
 
         except Exception as e:
             print(f"commands: {e}")
